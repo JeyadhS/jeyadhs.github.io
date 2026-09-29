@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Jeyadh Portfolio</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #f6f5f1;
+      color: #141414;
+      line-height: 1.5;
+    }
+    .wrap {
+      width: min(760px, calc(100% - 28px));
+      margin: 50px auto;
+    }
+    .box {
+      background: white;
+      border: 1px solid #d9d8d3;
+      border-radius: 18px;
+      padding: 28px;
+    }
+    h1 { margin: 0 0 8px; font-size: 38px; line-height: 1; }
+    h2 { margin: 0 0 8px; font-size: 22px; }
+    p { color: #707070; }
+    form { display: grid; gap: 12px; margin-top: 22px; }
+    input, textarea {
+      width: 100%;
+      padding: 12px 13px;
+      border: 1px solid #d9d8d3;
+      border-radius: 10px;
+      background: #faf9f6;
+      color: #141414;
+      font: inherit;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    input:focus, textarea:focus { outline: none; border-color: #141414; }
+    button, .link-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid #141414;
+      border-radius: 999px;
+      background: white;
+      color: #141414;
+      font: inherit;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button.dark, .link-button.dark { background: #111; color: white; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 2px; }
+    .note { font-size: 13px; color: #707070; }
+    .status {
+      display: none;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 9px;
+      background: #f0efe9;
+      color: #141414;
+    }
+    .status.show { display: block; }
+    hr { border: 0; border-top: 1px solid #d9d8d3; margin: 30px 0; }
+    .list { display: grid; gap: 10px; margin-top: 14px; }
+    .item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 13px;
+      border: 1px solid #d9d8d3;
+      border-radius: 10px;
+      background: #faf9f6;
+    }
+    .item strong { display: block; }
+    .item small { color: #707070; }
+    .danger { border-color: #777; }
+    @media (max-width: 600px) {
+      .wrap { margin: 22px auto; }
+      .box { padding: 20px; }
+      h1 { font-size: 32px; }
+      .item { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+  <link rel="icon" type="image/png" href="../logos/favicon.png">
+</head>
+<body>
+  <main class="wrap">
+    <section class="box">
+      <h1>Admin</h1>
+      <p>Manage the projects and certificate shown on the portfolio.</p>
+      <p class="note">This page stores data in your browser. It is not a secure login system.</p>
+
+      <form id="projectForm">
+        <input id="projectTitle" type="text" placeholder="Project name" required>
+        <input id="projectLanguage" type="text" placeholder="Language / type (example: Java)" required>
+        <input id="projectGithub" type="url" placeholder="GitHub repository URL">
+        <input id="projectImage" type="file" accept="image/*">
+        <textarea id="projectDescription" placeholder="Short project description" required></textarea>
+
+        <div class="buttons">
+          <button class="dark" type="submit">Add project</button>
+          <button type="button" id="exportProjects">Export backup</button>
+          <a class="link-button" href="../">Back to website</a>
+        </div>
+      </form>
+
+      <div class="status" id="projectStatus"></div>
+
+      <hr>
+
+      <h2>Saved projects</h2>
+      <div class="list" id="projectList"></div>
+
+      <hr>
+
+      <h2>Certificate</h2>
+      <p>Upload the certificate image that you want to show in the Certificates section.</p>
+
+      <form id="certificateForm">
+        <input id="certificateFile" type="file" accept="image/*" required>
+        <div class="buttons">
+          <button class="dark" type="submit">Save certificate</button>
+          <button type="button" id="removeCertificate">Remove certificate</button>
+        </div>
+      </form>
+
+      <div class="status" id="certificateStatus"></div>
+    </section>
+  </main>
+
+  <script>
+    const projectForm = document.getElementById("projectForm");
+    const projectList = document.getElementById("projectList");
+    const projectImage = document.getElementById("projectImage");
+    const projectStatus = document.getElementById("projectStatus");
+    const certificateForm = document.getElementById("certificateForm");
+    const certificateFile = document.getElementById("certificateFile");
+    const certificateStatus = document.getElementById("certificateStatus");
+
+    const startingProjects = [
+      {
+        title: "Java Calculator",
+        language: "Java",
+        description: "A small console program for practicing user input and arithmetic operations.",
+        github: "",
+        image: ""
+      },
+      {
+        title: "Drink Menu",
+        language: "Java",
+        description: "An interactive Java menu made to practice choices, prices, and switch statements.",
+        github: "",
+        image: ""
+      },
+      {
+        title: "Personal Portfolio",
+        language: "HTML / CSS / JavaScript",
+        description: "This personal portfolio website, made to show what I’m learning and the projects I’m building.",
+        github: "",
+        image: ""
+      }
+    ];
+
+    function getProjects() {
+      const saved = localStorage.getItem("jeyadhProjects");
+
+      if (!saved) {
+        return startingProjects.slice();
+      }
+
+      try {
+        const projects = JSON.parse(saved);
+        return Array.isArray(projects) ? projects : startingProjects.slice();
+      } catch (error) {
+        return startingProjects.slice();
+      }
+    }
+
+    function saveProjects(projects) {
+      try {
+        localStorage.setItem("jeyadhProjects", JSON.stringify(projects));
+        return true;
+      } catch (error) {
+        console.log(error);
+        return false;
+      }
+    }
+
+    // Make uploaded images smaller before saving them.
+    function resizeImage(file, maxSize, quality, done) {
+      const reader = new FileReader();
+
+      reader.onload = function () {
+        const image = new Image();
+
+        image.onload = function () {
+          let width = image.width;
+          let height = image.height;
+
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = Math.round(height * maxSize / width);
+              width = maxSize;
+            } else {
+              width = Math.round(width * maxSize / height);
+              height = maxSize;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, width, height);
+
+          done(canvas.toDataURL("image/jpeg", quality));
+        };
+
+        image.onerror = function () {
+          done(null);
+        };
+
+        image.src = reader.result;
+      };
+
+      reader.onerror = function () {
+        done(null);
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    function showStatus(element, message) {
+      element.textContent = message;
+      element.classList.add("show");
+    }
+
+    function showProjects() {
+      const projects = getProjects();
+      projectList.innerHTML = "";
+
+      if (projects.length === 0) {
+        projectList.innerHTML = "<p class='note'>No projects saved yet.</p>";
+        return;
+      }
+
+      projects.forEach(function (project, index) {
+        const item = document.createElement("div");
+        item.className = "item";
+
+        const info = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = project.title;
+        const details = document.createElement("small");
+        details.textContent = project.language;
+        info.appendChild(title);
+        info.appendChild(details);
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "danger";
+        removeButton.textContent = "Remove";
+        removeButton.addEventListener("click", function () {
+          removeProject(index);
+        });
+
+        item.appendChild(info);
+        item.appendChild(removeButton);
+        projectList.appendChild(item);
+      });
+    }
+
+    projectForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const title = document.getElementById("projectTitle").value.trim();
+      const language = document.getElementById("projectLanguage").value.trim();
+      const github = document.getElementById("projectGithub").value.trim();
+      const description = document.getElementById("projectDescription").value.trim();
+      const imageFile = projectImage.files[0];
+
+      if (imageFile) {
+        resizeImage(imageFile, 1200, 0.78, function (imageData) {
+          addProject(title, language, github, description, imageData || "");
+        });
+      } else {
+        addProject(title, language, github, description, "");
+      }
+    });
+
+    function addProject(title, language, github, description, image) {
+      const projects = getProjects();
+
+      projects.push({
+        title: title,
+        language: language,
+        description: description,
+        github: github,
+        image: image
+      });
+
+      if (!saveProjects(projects)) {
+        showStatus(projectStatus, "The project could not be saved. Remove some large saved images and try again.");
+        return;
+      }
+
+      projectForm.reset();
+      showProjects();
+      showStatus(projectStatus, "Project saved successfully.");
+    }
+
+    function removeProject(index) {
+      const projects = getProjects();
+
+      if (!confirm("Remove this project?")) {
+        return;
+      }
+
+      projects.splice(index, 1);
+      saveProjects(projects);
+      showProjects();
+      showStatus(projectStatus, "Project removed.");
+    }
+
+    document.getElementById("exportProjects").addEventListener("click", function () {
+      const projects = getProjects();
+      const file = new Blob([JSON.stringify(projects, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "jeyadh-projects-backup.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+
+    certificateForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const file = certificateFile.files[0];
+
+      if (!file) {
+        showStatus(certificateStatus, "Choose your certificate image first.");
+        return;
+      }
+
+      resizeImage(file, 1800, 0.88, function (imageData) {
+        if (!imageData) {
+          showStatus(certificateStatus, "The certificate could not be read.");
+          return;
+        }
+
+        try {
+          localStorage.setItem("jeyadhCertificate", imageData);
+          certificateForm.reset();
+          showStatus(certificateStatus, "Certificate saved successfully.");
+        } catch (error) {
+          showStatus(certificateStatus, "The certificate is still too large. Try a smaller image.");
+        }
+      });
+    });
+
+    document.getElementById("removeCertificate").addEventListener("click", function () {
+      localStorage.removeItem("jeyadhCertificate");
+      certificateForm.reset();
+      showStatus(certificateStatus, "Certificate removed.");
+    });
+
+    showProjects();
+  </script>
+</body>
+</html>
